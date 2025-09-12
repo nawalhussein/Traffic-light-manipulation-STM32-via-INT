@@ -45,6 +45,7 @@
 
 /* USER CODE BEGIN PV */
 unsigned char running=0;
+unsigned char emergency_mode;
 unsigned int last_press=0;
 /* USER CODE END PV */
 
@@ -182,7 +183,6 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_AFIO_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5, GPIO_PIN_RESET);
@@ -191,17 +191,17 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
                           |GPIO_PIN_4|GPIO_PIN_5, GPIO_PIN_RESET);
 
+  /*Configure GPIO pins : PA0 PA1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
   /*Configure GPIO pins : PA3 PA4 PA5 */
   GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4|GPIO_PIN_5;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PA6 */
-  GPIO_InitStruct.Pin = GPIO_PIN_6;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PB0 PB1 PB2 PB3
@@ -214,16 +214,18 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 2, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 2, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 3, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) //on/off button
 {
-  if (GPIO_Pin==GPIO_PIN_6)
+  if (GPIO_Pin==GPIO_PIN_0)
    { if (HAL_GetTick()-last_press<200) return; //debounce instead of delay, if button pressed less than 200ms from reset
    last_press=HAL_GetTick();
 	  running=!running;
@@ -233,8 +235,24 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 if(running==0)
   NVIC_SystemReset();
 
+if (GPIO_Pin==GPIO_PIN_1)
+{ emergency_mode=1;
+LCD16X2_Clear(MyLCD);
+LCD16X2_Write_String(MyLCD, "EMERGENCY");
+	while(emergency_mode)
+	{GPIOA->ODR |=(1<<3);
+	  GPIOA->ODR &=~((1<<4)|(1<<5));
 
+	if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1) == GPIO_PIN_RESET)
+      {emergency_mode = 0; NVIC_SystemReset();}
+
+  }
+
+
+  }
 }
+
+
 /* USER CODE END 4 */
 
 /**
